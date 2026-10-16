@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="theme-color" content="#1a1d22" media="(prefers-color-scheme: dark)">
+  <!-- Permite "Adicionar à tela inicial" abrir como app, sem a barra do navegador -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Ari">
+  <title>Transporte com o Ari</title>
+  <style>
+    /* ===================== CORES (tema claro e escuro) ===================== */
+    :root {
+      --fundo: #f3f4f6;
+      --cartao: #ffffff;
+      --texto: #1b1f24;
+      --texto-suave: #6b7280;
+      --borda: #dfe3e8;
+      --borda-forte: #b8bfc8;
+      --destaque: #0f766e;        /* cor principal: dias marcados e total */
+      --destaque-suave: #dcf1ee;
+      --sobre-destaque: #ffffff;  /* cor do "✓" dentro da caixa marcada */
+      --hoje: #d97706;            /* contorno do dia de hoje */
+      --perigo: #b42318;
+      --fim-de-semana: #eceef1;
+      --aviso-fundo: #fef3c7;
+      --aviso-texto: #78350f;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fundo: #111316;
+        --cartao: #1a1d22;
+        --texto: #eceef1;
+        --texto-suave: #9aa1ab;
+        --borda: #2b3038;
+        --borda-forte: #4a515c;
+        --destaque: #2dd4bf;
+        --destaque-suave: #113833;
+        --sobre-destaque: #06201d;
+        --hoje: #f59e0b;
+        --perigo: #f87171;
+        --fim-de-semana: #15181c;
+        --aviso-fundo: #3a2a06;
+        --aviso-texto: #fde68a;
+      }
+    }
+
+    /* ===================== BASE ===================== */
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--fundo);
+      color: var(--texto);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-size: 16px;
+      line-height: 1.4;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .pagina {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 0 16px 140px;              /* espaço para o resumo fixo no rodapé */
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+
+    /* ===================== TOPO (navegação entre meses) ===================== */
+    .topo {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 16px 0 4px;
+    }
+    .topo-centro { flex: 1; min-width: 0; text-align: center; }
+    .app-nome {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--texto-suave);
+    }
+    h1 { margin: 2px 0 0; font-size: 24px; line-height: 1.2; }
+    .btn-nav {
+      flex: none;
+      display: grid;
+      place-items: center;
+      width: 48px;
+      height: 48px;
+      border: 1px solid var(--borda);
+      border-radius: 12px;
+      background: var(--cartao);
+      color: var(--texto);
+      cursor: pointer;
+    }
+    .btn-nav:active { transform: scale(.95); }
+
+    .linha-info {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      margin-bottom: 8px;
+    }
+    .dica { margin: 0; font-size: 14px; color: var(--texto-suave); }
+    .btn-mes-atual {
+      border: 0;
+      background: none;
+      color: var(--destaque);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .aviso {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--aviso-fundo);
+      color: var(--aviso-texto);
+      font-size: 14px;
+    }
+
+    /* ===================== CALENDÁRIO ===================== */
+    .grade {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .cabecalho-semana { margin-bottom: 6px; }
+    .cabecalho-semana span {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      color: var(--texto-suave);
+    }
+    .cabecalho-semana span.fds { opacity: .55; }
+
+    /* Cada dia é um <label>: tocar em qualquer parte da casa marca a caixa */
+    .dia {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      min-height: 68px;
+      padding: 8px 2px;
+      background: var(--cartao);
+      border: 1px solid var(--borda);
+      border-radius: 12px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: background-color .15s, border-color .15s, opacity .15s;
+    }
+    .dia.vazio { background: none; border: 0; cursor: default; }
+    .dia .numero { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .dia.marcado { background: var(--destaque-suave); border-color: var(--destaque); }
+
+    /* Fim de semana: mais discreto enquanto não estiver marcado */
+    .dia.fim-de-semana { background: var(--fim-de-semana); }
+    .dia.fim-de-semana:not(.marcado) { opacity: .55; }
+    .dia.fim-de-semana.marcado { background: var(--destaque-suave); }
+
+    /* Dia de hoje: contorno âmbar */
+    .dia.hoje { border-color: var(--hoje); box-shadow: 0 0 0 2px var(--hoje); }
+    .dia.hoje .numero { color: var(--hoje); font-weight: 800; }
+
+    /* Caixa de check grande e personalizada */
+    .dia input {
+      appearance: none;
+      -webkit-appearance: none;
+      display: grid;
+      place-content: center;
+      width: 30px;
+      height: 30px;
+      margin: 0;
+      border: 2px solid var(--borda-forte);
+      border-radius: 8px;
+      background: var(--cartao);
+      cursor: pointer;
+      transition: background-color .15s, border-color .15s;
+    }
+    .dia input::after {
+      content: "";
+      width: 14px;
+      height: 8px;
+      border-left: 3px solid var(--sobre-destaque);
+      border-bottom: 3px solid var(--sobre-destaque);
+      transform: translateY(-2px) rotate(-45deg);
+      opacity: 0;
+    }
+    .dia input:checked { background: var(--destaque); border-color: var(--destaque); }
+    .dia input:checked::after { opacity: 1; }
+    .dia input:focus-visible { outline: 3px solid var(--destaque); outline-offset: 2px; }
+
+    .btn-limpar {
+      display: block;
+      width: 100%;
+      min-height: 48px;
+      margin-top: 20px;
+      border: 1px solid var(--perigo);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--perigo);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-limpar:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* ===================== RESUMO FIXO NO RODAPÉ ===================== */
+    .resumo {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+      background: var(--cartao);
+      border-top: 1px solid var(--borda);
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, .06);
+    }
+    .resumo-conteudo {
+      display: grid;
+      grid-template-columns: auto auto 1fr;
+      align-items: end;
+      gap: 18px;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .resumo-item { display: flex; flex-direction: column; }
+    .resumo-rotulo {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      color: var(--texto-suave);
+    }
+    .resumo-valor { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .resumo-total { text-align: right; }
+    .resumo-total .resumo-valor { font-size: 28px; line-height: 1.15; color: var(--destaque); }
+  </style>
+</head>
+<body>
+  <div class="pagina">
+    <header class="topo">
+      <button class="btn-nav" id="btn-anterior" type="button" aria-label="Mês anterior">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="topo-centro">
+        <p class="app-nome">Transporte com o Ari</p>
+        <h1 id="titulo-mes">&nbsp;</h1>
+      </div>
+      <button class="btn-nav" id="btn-proximo" type="button" aria-label="Próximo mês">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </header>
+
+    <!-- No mês atual mostra a dica; nos outros, o botão de voltar -->
+    <div class="linha-info">
+      <p class="dica" id="dica">Toque nos dias em que você foi com o Ari.</p>
+      <button class="btn-mes-atual" id="btn-mes-atual" type="button" hidden>← Voltar para o mês atual</button>
+    </div>
+
+    <p class="aviso" id="aviso" hidden>
+      Este navegador não está salvando as marcações (talvez seja uma aba anônima).
+      Elas serão perdidas ao fechar a página.
+    </p>
+
+    <main>
+      <div class="grade cabecalho-semana" id="cabecalho-semana" aria-hidden="true"></div>
+      <div class="grade" id="calendario"></div>
+      <button class="btn-limpar" id="btn-limpar" type="button">Limpar mês</button>
+    </main>
+  </div>
+
+  <footer class="resumo">
+    <div class="resumo-conteudo">
+      <div class="resumo-item">
+        <span class="resumo-rotulo">Dias</span>
+        <strong class="resumo-valor" id="qtd-dias">0</strong>
+      </div>
+      <div class="resumo-item">
+        <span class="resumo-rotulo">Por dia</span>
+        <strong class="resumo-valor" id="valor-dia">R$ 0,00</strong>
+      </div>
+      <div class="resumo-item resumo-total">
+        <span class="resumo-rotulo">Total do mês</span>
+        <strong class="resumo-valor" id="total-mes" aria-live="polite">R$ 0,00</strong>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ===================== CONFIGURAÇÕES =====================
+    // Valor de cada dia de transporte, em reais. Mude aqui se o preço mudar.
+    // (Atenção: o total de TODOS os meses passa a usar o novo valor.)
+    const VALOR_DIA = 20;
+
+    // Dia em que a semana começa no calendário: 1 = segunda, 0 = domingo.
+    const PRIMEIRO_DIA_SEMANA = 1;
+
+    // Prefixo das chaves no localStorage. Cada mês fica numa chave própria,
+    // por exemplo: "transporte-ari:2026-10" → [1,2,6,8]
+    const PREFIXO_CHAVE = 'transporte-ari';
+
+    // ===================== TEXTOS =====================
+    const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    // Mesma ordem do Date.getDay(): 0 = domingo ... 6 = sábado
+    const DIAS_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+    const DIAS_SEMANA_EXTENSO = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira',
+                                 'quinta-feira', 'sexta-feira', 'sábado'];
+
+    const formatarReais = valor =>
+      valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const ehFimDeSemana = diaSemana => diaSemana === 0 || diaSemana === 6;
+
+    // ===================== ELEMENTOS DA PÁGINA =====================
+    const el = {
+      titulo: document.getElementById('titulo-mes'),
+      dica: document.getElementById('dica'),
+      btnMesAtual: document.getElementById('btn-mes-atual'),
+      btnAnterior: document.getElementById('btn-anterior'),
+      btnProximo: document.getElementById('btn-proximo'),
+      aviso: document.getElementById('aviso'),
+      cabecalhoSemana: document.getElementById('cabecalho-semana'),
+      calendario: document.getElementById('calendario'),
+      btnLimpar: document.getElementById('btn-limpar'),
+      qtdDias: document.getElementById('qtd-dias'),
+      valorDia: document.getElementById('valor-dia'),
+      total: document.getElementById('total-mes'),
+    };
+
+    // ===================== ESTADO =====================
+    // Mês que está na tela (mes: 0 = janeiro ... 11 = dezembro)
+    const inicio = new Date();
+    let ano = inicio.getFullYear();
+    let mes = inicio.getMonth();
+    let diasMarcados = new Set(); // números dos dias marcados no mês exibido
+
+    // ===================== SALVAR / CARREGAR (localStorage) =====================
+    function chaveDoMes(a, m) {
+      return `${PREFIXO_CHAVE}:${a}-${String(m + 1).padStart(2, '0')}`;
+    }
+
+    function carregarMes(a, m) {
+      try {
+        const salvo = JSON.parse(localStorage.getItem(chaveDoMes(a, m)) || '[]');
+        return new Set(Array.isArray(salvo) ? salvo : []);
+      } catch {
+        return new Set(); // sem acesso ao armazenamento ou dado corrompido
+      }
+    }
+
+    function salvarMes() {
+      try {
+        const chave = chaveDoMes(ano, mes);
+        if (diasMarcados.size === 0) {
+          localStorage.removeItem(chave); // mês vazio não precisa ocupar espaço
+        } else {
+          const dias = [...diasMarcados].sort((a, b) => a - b);
+          localStorage.setItem(chave, JSON.stringify(dias));
+        }
+      } catch {
+        el.aviso.hidden = false;
+      }
+    }
+
+    function armazenamentoDisponivel() {
+      try {
+        const teste = `${PREFIXO_CHAVE}:teste`;
+        localStorage.setItem(teste, '1');
+        localStorage.removeItem(teste);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    // ===================== DESENHAR A TELA =====================
+    // Linha "seg ter qua ..." acima do calendário
+    function renderizarCabecalhoSemana() {
+      const nomes = [];
+      for (let i = 0; i < 7; i++) {
+        const diaSemana = (PRIMEIRO_DIA_SEMANA + i) % 7;
+        const span = document.createElement('span');
+        span.textContent = DIAS_SEMANA[diaSemana];
+        if (ehFimDeSemana(diaSemana)) span.classList.add('fds');
+        nomes.push(span);
+      }
+      el.cabecalhoSemana.replaceChildren(...nomes);
+    }
+
+    // Monta o calendário do mês exibido, já com as marcações salvas
+    function renderizarMes() {
+      diasMarcados = carregarMes(ano, mes);
+
+      const hoje = new Date();
+      const ehMesAtual = hoje.getFullYear() === ano && hoje.getMonth() === mes;
+
+      el.titulo.textContent = `${MESES[mes]} ${ano}`;
+      el.dica.hidden = !ehMesAtual;
+      el.btnMesAtual.hidden = ehMesAtual;
+
+      const totalDias = new Date(ano, mes + 1, 0).getDate(); // "dia 0" do mês seguinte = último dia deste
+      const diaSemanaDoDia1 = new Date(ano, mes, 1).getDay();
+      const casasVazias = (diaSemanaDoDia1 - PRIMEIRO_DIA_SEMANA + 7) % 7; // alinha o dia 1 na coluna certa
+
+      const casas = [];
+      for (let i = 0; i < casasVazias; i++) {
+        const vazio = document.createElement('div');
+        vazio.className = 'dia vazio';
+        casas.push(vazio);
+      }
+
+      for (let dia = 1; dia <= totalDias; dia++) {
+        const diaSemana = (diaSemanaDoDia1 + dia - 1) % 7;
+        const marcado = diasMarcados.has(dia);
+
+        const casa = document.createElement('label');
+        casa.className = 'dia';
+        casa.classList.toggle('fim-de-semana', ehFimDeSemana(diaSemana));
+        casa.classList.toggle('hoje', ehMesAtual && dia === hoje.getDate());
+        casa.classList.toggle('marcado', marcado);
+
+        const numero = document.createElement('span');
+        numero.className = 'numero';
+        numero.textContent = dia;
+
+        const caixa = document.createElement('input');
+        caixa.type = 'checkbox';
+        caixa.checked = marcado;
+        caixa.dataset.dia = dia;
+        caixa.setAttribute('aria-label',
+          `${DIAS_SEMANA_EXTENSO[diaSemana]}, ${dia} de ${MESES[mes].toLowerCase()}`);
+
+        casa.append(numero, caixa);
+        casas.push(casa);
+      }
+
+      el.calendario.replaceChildren(...casas);
+      atualizarResumo();
+    }
+
+    // Recalcula dias × valor e atualiza o rodapé
+    function atualizarResumo() {
+      const qtd = diasMarcados.size;
+      el.qtdDias.textContent = qtd;
+      el.total.textContent = formatarReais(qtd * VALOR_DIA);
+      el.btnLimpar.disabled = qtd === 0;
+    }
+
+    function irParaMes(novoAno, novoMes) {
+      const destino = new Date(novoAno, novoMes, 1); // corrige virada de ano (ex.: mês 12 → janeiro)
+      ano = destino.getFullYear();
+      mes = destino.getMonth();
+      renderizarMes();
+    }
+
+    // ===================== AÇÕES DO USUÁRIO =====================
+    // Marcar/desmarcar: um único "ouvinte" no calendário cuida de todas as caixas
+    el.calendario.addEventListener('change', evento => {
+      const caixa = evento.target;
+      const dia = Number(caixa.dataset.dia);
+
+      if (caixa.checked) diasMarcados.add(dia);
+      else diasMarcados.delete(dia);
+
+      caixa.closest('.dia').classList.toggle('marcado', caixa.checked);
+      salvarMes();
+      atualizarResumo();
+    });
+
+    el.btnAnterior.addEventListener('click', () => irParaMes(ano, mes - 1));
+    el.btnProximo.addEventListener('click', () => irParaMes(ano, mes + 1));
+    el.btnMesAtual.addEventListener('click', () => {
+      const hoje = new Date();
+      irParaMes(hoje.getFullYear(), hoje.getMonth());
+    });
+
+    el.btnLimpar.addEventListener('click', () => {
+      const qtd = diasMarcados.size;
+      if (qtd === 0) return;
+
+      const pergunta = `Desmarcar ${qtd} ${qtd === 1 ? 'dia' : 'dias'} de ${MESES[mes]} de ${ano}?\n\n` +
+                       'Isso não pode ser desfeito.';
+      if (!confirm(pergunta)) return;
+
+      diasMarcados.clear();
+      salvarMes();
+      renderizarMes();
+    });
+
+    // Ao voltar para a página (ex.: reabrir o app no dia seguinte), redesenha
+    // para atualizar o destaque de "hoje" e pegar mudanças feitas em outra aba.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') renderizarMes();
+    });
+
+    // ===================== INÍCIO =====================
+    el.valorDia.textContent = formatarReais(VALOR_DIA);
+    el.aviso.hidden = armazenamentoDisponivel();
+    renderizarCabecalhoSemana();
+    renderizarMes();
+  </script>
+</body>
+</html>
